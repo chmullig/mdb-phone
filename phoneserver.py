@@ -40,7 +40,6 @@ def menu():
     """Handle the main menu."""
     resp = twilio.twiml.Response()
     keypress = request.values.get('Digits', None)
-    print keypress
     if keypress == '1':
         return redirect("/lookup")
     elif keypress == '2':
@@ -56,7 +55,10 @@ def add():
     resp = twilio.twiml.Response()
     resp.say("Let's record a new entry!")
     resp.say("What is your name?")
-    resp.record(transcribeCallback="/addname")
+    resp.record(transcribeCallback="/addname", maxLength=8)
+    resp.say("What is your message?")
+    resp.record(transcribeCallback="/addmsg", maxLength=15)
+    return resp
 
 
 @app.route("/addname", methods=["GET", "POST"])
@@ -71,6 +73,37 @@ def addmsg():
 
 def sayMsg(resp, mdbrec, prompt="an"):
     resp.say("In %s entry, number %s, \"%s\", said, \"%s\"." % (prompt, mdbrec[0], mdbrec[1], mdbrec[2]))
+
+@app.route("/sms", methods=["GET", "POST"])
+def sms():
+    """Handle a sms message"""
+    resp = twilio.twiml.Response()
+    body = request.values.get("Body", None)
+    print "Body was", body
+    if body is not None and body.lower().startswith("add"):
+        resp.sms("Unfortunately adding isn't implemented yet.")
+    elif body is not None and any(body.lower().startswith(x) for x in ["lookup", "lu", "?"]):
+        try:
+            key = body.split(" ", 1)[1]
+        except IndexError:
+            key = ""
+        matching = myMDB.lookup(key)
+        matching.sort(reverse=True)
+        message = ["(%s mtchs)" % len(matching)]
+        if len(matching) > 0:
+            message.append("%s:{%s}said{%s}" % matching[0])
+        while len(matching) > len(message)-1:
+            newmsg = "%s:{%s}said{%s}" % random.choice(matching)
+            if newmsg in message:
+                continue
+            if len(newmsg) + 1 + len(" ".join(message)) <= 160:
+                message.append(newmsg)
+            else:
+                break
+        resp.sms(" ".join(message))
+    else:
+        resp.sms("Search the database by texting me with \"lookup <key>\" (or \"lu <key>\"). Add with \"add name # msg\".")
+    return str(resp)
 
 @app.route("/lookup", methods=["GET", "POST"])
 def lookup():
@@ -109,7 +142,6 @@ def lookup():
         g.say("To search the database please enter up to 5 letters using your digital keypad. Press pound when complete.")
     resp.redirect("/lookup?Digits=", method="GET")
     return str(resp)
-
  
 if __name__ == "__main__":
     try:
