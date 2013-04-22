@@ -10,6 +10,7 @@ class MdbRec(Structure):
 class MdbDatabase(object):
     def __init__(self, msgFile=None):
         self.messages = []
+        self._msgFile = msgFile
         if msgFile:
             self.loadFile(msgFile)
 
@@ -18,12 +19,20 @@ class MdbDatabase(object):
 
     def loadFile(self, msgFile):
         self.messages = []
+        self._msgFile = msgFile
         record = MdbRec()
         i = 0
         while msgFile.readinto(record) != 0:
             self.messages.append(copy(record))
             i += 1
         return i
+
+    def save(self):
+        """NOTE: seeks to 0 and dumps the whole thing!"""
+        self._msgFile.seek(0)
+        for rec in self.messages:
+            self._msgFile.write(rec)
+        
 
     def writeFile(self, msgFile):
         for rec in self.messages:
@@ -37,6 +46,6 @@ class MdbDatabase(object):
         return results
 
     def add(self, name, msg):
-        newmdb = MdbRec(name, msg)
+        newmdb = MdbRec(name[:16], msg[:24])
         self.messages.append(newmdb)
 

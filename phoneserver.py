@@ -28,11 +28,12 @@ myMDB = MdbDatabase()
  
 @app.route("/", methods=['GET', 'POST'])
 def welcome():
-    """Respond to incoming requests."""
+    """Respond to incoming requests. Right now only offer the option of lookuping up."""
     resp = twilio.twiml.Response()
-    resp.say("Thank you for calling the M D B!")
-    with resp.gather(numDigits=1, action="/mainmenu") as g:
-        g.say("Press 1 to lookup messages, or 2 to add a new message")
+    resp.say("Thank you for calling the M D B message database!")
+    resp.say("To add an entry or perform text based lookups you may send me a text message at this number.")
+    #resp.redirect("/mainmenu")
+    resp.redirect("/lookup")
     return str(resp)
 
 @app.route("/mainmenu", methods=["GET", "POST"])
@@ -58,8 +59,9 @@ def add():
     resp.record(transcribeCallback="/addname", maxLength=8)
     resp.say("What is your message?")
     resp.record(transcribeCallback="/addmsg", maxLength=15)
+    resp.say("Thank you. Your message will be added to the database.")
+    resp.redirect("/mainmenu")
     return resp
-
 
 @app.route("/addname", methods=["GET", "POST"])
 def addname():
@@ -72,7 +74,42 @@ def addmsg():
     print request.values
 
 def sayMsg(resp, mdbrec, prompt="an"):
-    resp.say("In %s entry, number %s, \"%s\", said, \"%s\"." % (prompt, mdbrec[0], mdbrec[1], mdbrec[2]))
+    """Helper function for formatting messages to be said below"""
+    resp.say("In %s entry, number %s, \"%s\", said, \"%s\". ." % (prompt, mdbrec[0], mdbrec[1], mdbrec[2]))
+
+@app.route("/lookup", methods=["GET", "POST"])
+def lookup():
+    """Handle a mdb lookup"""
+    resp = twilio.twiml.Response()
+    keypresses = request.values.get('Digits', None)
+    if keypresses is not None:
+        combos = list("".join(y) for y in product(*[keys[x] for x in keypresses])) or [""]
+        print "Keypress: %s. Possible Values: %s" % (keypresses, ", ".join(combos))
+        matchSet = set()
+        for c in combos:
+            matches = myMDB.lookup(c)
+            for match in matches:
+                matchSet.add(match)
+        matching = list(matchSet)
+        matching.sort(reverse=True)
+        
+        resp.say("There are %s matching entries." % len(matching) or 0)
+        if len(matching) == 1:
+            sayMsg(resp, matching[0], "the only")
+        elif len(matching) == 2:
+            sayMsg(resp, matching[1], "the first")
+            sayMsg(resp, matching[0], "the last")
+        elif len(matching) > 2:
+            sayMsg(resp, matching[0], "the last")
+            sayMsg(resp, random.choice(matching[1:]), "a random")
+            sayMsg(resp, random.choice(matching[1:]), "another random")
+    resp.pause(length=1)
+    with resp.gather(numDigits=5, finishOnKey="#", timeout=15, method="GET", action="/lookup") as g:
+        g.say("To search the database please enter up to 5 letters using your digital keypad. Press pound when complete.")
+    resp.redirect("/lookup?Digits=", method="GET")
+    return str(resp)
+
+
 
 @app.route("/sms", methods=["GET", "POST"])
 def sms():
@@ -81,15 +118,24 @@ def sms():
     body = request.values.get("Body", None)
     print "Body was", body
     if body is not None and body.lower().startswith("add"):
-        resp.sms("Unfortunately adding isn't implemented yet.")
-    elif body is not None and any(body.lower().startswith(x) for x in ["lookup", "lu", "?"]):
+        try:
+            value = body.split(" ", 1)[1]
+            name, msg = value.split("#")
+        except IndexError:
+            return str(resp)
+
+        name = name.strip()
+        msg = msg.strip()
+        myMDB.add(name,  msg)
+        myMDB.save()
+    elif body is not None and any(body.lower().startswith(x) for x in ["lookup", "lu"]):
         try:
             key = body.split(" ", 1)[1]
         except IndexError:
             key = ""
         matching = myMDB.lookup(key)
         matching.sort(reverse=True)
-        message = ["(%s mtchs)" % len(matching)]
+        message = ["%s matches|" % len(matching)]
         if len(matching) > 0:
             message.append("%s:{%s}said{%s}" % matching[0])
         while len(matching) > len(message)-1:
@@ -104,51 +150,12 @@ def sms():
     else:
         resp.sms("Search the database by texting me with \"lookup <key>\" (or \"lu <key>\"). Add with \"add name # msg\".")
     return str(resp)
-
-@app.route("/lookup", methods=["GET", "POST"])
-def lookup():
-    """Handle a mdb lookup"""
-    resp = twilio.twiml.Response()
-    keypresses = request.values.get('Digits', None)
-    if keypresses is not None:
-        combos = list("".join(y) for y in product(*[keys[x] for x in keypresses])) or [""]
-        print "Keypress: %s. Possible Values: %s" % (keypresses, ", ".join(combos))
-
-        #matching = list(set(rec for rec in myMDB.messages if (any(True for c in combos if c in rec.name.upper()) or any(True for c in combos if c in rec.msg.upper()))))
-        matchSet = set()
-        for c in combos:
-            matches = myMDB.lookup(c)
-            for match in matches:
-                matchSet.add(match)
-        matching = list(matchSet)
-        matching.sort(reverse=True)
-        
-        resp.say("There are %s matching entries." % len(matching) or 0)
-        if len(matching) == 1:
-            sayMsg(resp, matching[0], "the only")
-            #resp.say("In the only entry, number %s, \"%s\", said, \"%s\"." % matching[0])
-        elif len(matching) == 2:
-            sayMsg(resp, matching[0], "the last")
-            sayMsg(resp, matching[1], "the first")
-            #resp.say("In the last entry, number %s, \"%s\" said \"%s\"." % matching[0])
-            #resp.say("In the first entry, number %s, \"%s\" said \"%s\"." % matching[1])
-        elif len(matching) > 2:
-            sayMsg(resp, matching[0], "the last")
-            sayMsg(resp, random.choice(matching[1:]), "a random")
-            #resp.say("In the last entry, number %s, \"%s\" said \"%s\"." % matching[0])
-            #resp.say("In a random entry, number %s, \"%s\" said \"%s\"." % random.choice(matching[1:]))
-    resp.pause(length=1)
-    with resp.gather(numDigits=5, finishOnKey="#", timeout=15, method="GET", action="/lookup") as g:
-        g.say("To search the database please enter up to 5 letters using your digital keypad. Press pound when complete.")
-    resp.redirect("/lookup?Digits=", method="GET")
-    return str(resp)
  
 if __name__ == "__main__":
     try:
         mdbFileName = sys.argv[1]
-        mdbFile = open(mdbFileName, 'rb')
+        mdbFile = open(mdbFileName, 'rb+')
         myMDB.loadFile(mdbFile)
-        mdbFile.close()
     except KeyError:
         print "please execute as %s <mdb file>" % sys.argv[0]
         exit(1)
