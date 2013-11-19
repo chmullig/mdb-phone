@@ -21,5 +21,3 @@ if __name__ == "__main__":
         for i, name, msg in myrecords.lookup(key):
                 print "%4d: {%s} said {%s}" % (i, name, msg)
         print
-
-

@@ -5,16 +5,18 @@ import sys
 if __name__ == "__main__":
     try:
         filename = sys.argv[1]
-        mdbFile = open(filename, 'ab')
+        mdbFile = open(filename, 'rb+')
     except:
         print "Usage: python mdb-add.py <filename>"
         exit(1)
     myrecords = MdbDatabase()
+    myrecords.loadFile(mdbFile)
 
     name = raw_input("name: ")
     msg = raw_input("msg: ")
 
     myrecords.add(name, msg)
-    myrecords.writeFile(mdbFile)
-
+    last = myrecords[-1]
+    print "%4d: {%s} said {%s}" % (len(myrecords), last.name, last.msg)
+    myrecords.save()
 

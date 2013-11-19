@@ -1,5 +1,5 @@
 import sys
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, g
 import twilio.twiml
 from itertools import product, chain
 from mdb import *
@@ -24,7 +24,16 @@ keys = { k : v + k + v.lower() for (k, v) in keys.items()}
 
 
 app = Flask(__name__)
-myMDB = MdbDatabase()
+
+def getMDB():
+    myMDB = getattr(g, '_mdb', None)
+    if myMDB is None:
+        g._mdb = MdbDatabase()
+        mdbFile = open(app.config['MDB_FILE'], 'rb+')
+        g._mdb.loadFile(mdbFile)
+        myMDB = g._mdb
+    return myMDB
+
  
 @app.route("/", methods=['GET', 'POST'])
 def welcome():
@@ -51,6 +60,7 @@ def lookup():
     Handle a voice mdb lookup
     """
 
+    myMDB = getMDB()
     resp = twilio.twiml.Response()
     keypresses = request.values.get('Digits', None)
     if keypresses is not None:
@@ -85,6 +95,8 @@ def lookup():
 @app.route("/sms", methods=["GET", "POST"])
 def sms():
     """Handle a sms message"""
+    myMDB = getMDB()
+
     resp = twilio.twiml.Response()
     body = request.values.get("Body", None)
     print "Body was", body
@@ -130,8 +142,7 @@ def sms():
 if __name__ == "__main__":
     try:
         mdbFileName = sys.argv[1]
-        mdbFile = open(mdbFileName, 'rb+')
-        myMDB.loadFile(mdbFile)
+	app.config['MDB_FILE'] = mdbFileName
     except KeyError:
         print "please execute as %s <mdb file>" % sys.argv[0]
         exit(1)

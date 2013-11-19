@@ -17,6 +17,9 @@ class MdbDatabase(object):
     def __len__(self):
         return len(self.messages)
 
+    def __getitem__(self, key):
+        return self.messages[key]
+
     def loadFile(self, msgFile):
         self.messages = []
         self._msgFile = msgFile
@@ -42,7 +45,7 @@ class MdbDatabase(object):
         results = []
         for i, rec in enumerate(self.messages):
             if key[:5] in rec.name or key[:5] in rec.msg:
-                results.append((i, rec.name, rec.msg))
+                results.append((i+1, rec.name, rec.msg))
         return results
 
     def add(self, name, msg):
