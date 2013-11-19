@@ -5,7 +5,7 @@ from itertools import product, chain
 from mdb import *
 import random
 
-
+#Translate keys on the phone pad to the possible numbers
 keys = {
     '1' : "",
     '2' : "ABC",
@@ -28,63 +28,34 @@ myMDB = MdbDatabase()
  
 @app.route("/", methods=['GET', 'POST'])
 def welcome():
-    """Respond to incoming requests. Right now only offer the option of lookuping up."""
+    """
+    Respond to incoming voice requests. Right now only offer the option of looking up.
+    """
+
     resp = twilio.twiml.Response()
     resp.say("Thank you for calling the M D B message database!")
     resp.say("To add an entry or perform text based lookups you may send me a text message at this number.")
-    #resp.redirect("/mainmenu")
     resp.redirect("/lookup")
     return str(resp)
 
-@app.route("/mainmenu", methods=["GET", "POST"])
-def menu():
-    """Handle the main menu."""
-    resp = twilio.twiml.Response()
-    keypress = request.values.get('Digits', None)
-    if keypress == '1':
-        return redirect("/lookup")
-    elif keypress == '2':
-        return redirect("/add")
-    else:
-        with resp.gather(numDigits=1, action="/mainmenu") as g:
-            g.say("Press 1 to lookup messages, or 2 to add a new message")
-        return str(resp)
-
-@app.route("/add", methods=["GET", "POST"])
-def add():
-    """Add a new entry"""
-    resp = twilio.twiml.Response()
-    resp.say("Let's record a new entry!")
-    resp.say("What is your name?")
-    resp.record(transcribeCallback="/addname", maxLength=8)
-    resp.say("What is your message?")
-    resp.record(transcribeCallback="/addmsg", maxLength=15)
-    resp.say("Thank you. Your message will be added to the database.")
-    resp.redirect("/mainmenu")
-    return resp
-
-@app.route("/addname", methods=["GET", "POST"])
-def addname():
-    """Callback for transcribed name"""
-    print request.values
-
-@app.route("/addmsg", methods=["GET", "POST"])
-def addmsg():
-    """Callback for transcribed msg"""
-    print request.values
-
 def sayMsg(resp, mdbrec, prompt="an"):
-    """Helper function for formatting messages to be said below"""
+    """
+    Helper function for formatting messages to be said below
+    """
+
     resp.say("In %s entry, number %s, \"%s\", said, \"%s\". ." % (prompt, mdbrec[0], mdbrec[1], mdbrec[2]))
 
 @app.route("/lookup", methods=["GET", "POST"])
 def lookup():
-    """Handle a mdb lookup"""
+    """
+    Handle a voice mdb lookup
+    """
+
     resp = twilio.twiml.Response()
     keypresses = request.values.get('Digits', None)
     if keypresses is not None:
+        # turn the numberic keypresses into a set of possible strings they want to search for
         combos = list("".join(y) for y in product(*[keys[x] for x in keypresses])) or [""]
-        #print "Keypress: %s. Possible Values: %s" % (keypresses, ", ".join(combos))
         matchSet = set()
         for c in combos:
             matches = myMDB.lookup(c)
@@ -117,7 +88,9 @@ def sms():
     resp = twilio.twiml.Response()
     body = request.values.get("Body", None)
     print "Body was", body
+
     if body is not None and body.lower().startswith("add"):
+        #We're in mdb-add mode
         try:
             value = body.split(" ", 1)[1]
             name, msg = value.split("#")
@@ -128,7 +101,9 @@ def sms():
         msg = msg.strip()
         myMDB.add(name,  msg)
         myMDB.save()
+
     elif body is not None and any(body.lower().startswith(x) for x in ["lookup", "lu"]):
+        #we're in mdb-lookup mode
         try:
             key = body.split(" ", 1)[1]
         except IndexError:
@@ -148,6 +123,7 @@ def sms():
                 break
         resp.sms(" ".join(message))
     else:
+        #We can't figure out what's up, so let's give them a hint
         resp.sms("Search the database by texting me with \"lookup <key>\" (or \"lu <key>\"). Add with \"add name # msg\".")
     return str(resp)
  
