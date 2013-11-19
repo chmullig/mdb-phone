@@ -84,7 +84,7 @@ def lookup():
     keypresses = request.values.get('Digits', None)
     if keypresses is not None:
         combos = list("".join(y) for y in product(*[keys[x] for x in keypresses])) or [""]
-        print "Keypress: %s. Possible Values: %s" % (keypresses, ", ".join(combos))
+        #print "Keypress: %s. Possible Values: %s" % (keypresses, ", ".join(combos))
         matchSet = set()
         for c in combos:
             matches = myMDB.lookup(c)
