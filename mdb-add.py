@@ -5,13 +5,16 @@ import sys
 if __name__ == "__main__":
     try:
         filename = sys.argv[1]
-        mdbFile = open(filename, 'ab+')
+        mdbFile = open(filename, 'rb+')
         mdbFile.seek(0)
+    except IOError, e:
+        if e.errno == 2:
+            mdbFile = open(filename, 'ab+')
+            mdbFile.seek(0)
     except:
         print "Usage: python mdb-add.py <filename>"
         exit(1)
-    myrecords = MdbDatabase()
-    myrecords.loadFile(mdbFile)
+    myrecords = MdbDatabase(mdbFile)
 
     name = raw_input("name: ")
     msg = raw_input("msg: ")
