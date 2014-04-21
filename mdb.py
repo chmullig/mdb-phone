@@ -33,13 +33,13 @@ class MdbDatabase(object):
     def save(self):
         """NOTE: seeks to 0 and dumps the whole thing!"""
         self._msgFile.seek(0)
-        for rec in self.messages:
-            self._msgFile.write(rec)
+        self.writeFile(self._msgFile)
         
 
     def writeFile(self, msgFile):
         for rec in self.messages:
-            msgFile.write(rec)
+            txt = string_at(byref(rec), sizeof(rec))
+            msgFile.write(txt)
     
     def lookup(self, key=""):
         results = []

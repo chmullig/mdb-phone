@@ -5,7 +5,8 @@ import sys
 if __name__ == "__main__":
     try:
         filename = sys.argv[1]
-        mdbFile = open(filename, 'rb+')
+        mdbFile = open(filename, 'ab+')
+        mdbFile.seek(0)
     except:
         print "Usage: python mdb-add.py <filename>"
         exit(1)
